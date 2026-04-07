@@ -1,0 +1,31 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pro-purple-950: #0d0521;
+  --color-pro-purple-900: #1a0b3b;
+  --color-pro-purple-800: #2d1b5a;
+  --color-pro-purple-700: #4a2d8a;
+  --color-pro-purple-600: #6b46c1;
+  --color-pro-purple-500: #805ad5;
+  --color-pro-purple-400: #9f7aea;
+  --color-pro-purple-300: #b794f4;
+  --color-pro-purple-200: #d6bcfa;
+  --color-pro-purple-100: #e9d8fd;
+  --color-pro-purple-50: #faf5ff;
+}
+
+@layer base {
+  body {
+    @apply bg-pro-purple-950 text-white antialiased;
+    background: radial-gradient(circle at top right, #2d1b5a 0%, #0d0521 100%);
+    min-height: 100vh;
+  }
+}
+
+.glass-card {
+  @apply bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl;
+}
+
+.glass-button {
+  @apply bg-white/20 hover:bg-white/30 backdrop-blur-sm border border-white/10 transition-all;
+}

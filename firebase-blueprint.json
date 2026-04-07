@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and learning preferences.",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email" },
+        "target_profession": { "type": "string" },
+        "target_language": { "type": "string", "enum": ["English", "French"] },
+        "estimated_level": { "type": "string", "enum": ["beginner", "intermediate", "advanced"] },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "target_profession", "target_language", "estimated_level"]
+    },
+    "Simulation": {
+      "title": "Simulation",
+      "description": "Roleplay simulation session.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "scenario_id": { "type": "string" },
+        "evaluation_score": { "type": "integer" },
+        "chat_history": { "type": "array", "items": { "type": "object" } },
+        "ai_feedback": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "scenario_id", "chat_history"]
+    },
+    "Flashcard": {
+      "title": "Flashcard",
+      "description": "Learning card for vocabulary or concepts.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "word_en": { "type": "string" },
+        "translation_fr": { "type": "string" },
+        "context_example": { "type": "string" },
+        "mastery_level": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "review_date": { "type": "string", "format": "date-time" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "word_en", "translation_fr", "mastery_level"]
+    },
+    "Email": {
+      "title": "Email",
+      "description": "Email correction and feedback.",
+      "type": "object",
+      "properties": {
+        "user_id": { "type": "string" },
+        "original_text": { "type": "string" },
+        "corrected_text": { "type": "string" },
+        "grammar_feedback": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["user_id", "original_text", "corrected_text"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents."
+    },
+    "/simulations/{simulationId}": {
+      "schema": "Simulation",
+      "description": "Simulation session records."
+    },
+    "/flashcards/{flashcardId}": {
+      "schema": "Flashcard",
+      "description": "User flashcards."
+    },
+    "/emails/{emailId}": {
+      "schema": "Email",
+      "description": "Email correction history."
+    }
+  }
+}

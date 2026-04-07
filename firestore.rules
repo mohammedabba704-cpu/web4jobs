@@ -1,0 +1,153 @@
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: userId (Auth UID)
+// Fields:
+//   - email: string (required, email format)
+//   - target_profession: string (required)
+//   - estimated_level: string (required, enum: beginner, intermediate, advanced)
+//   - created_at: timestamp (required)
+//
+// Collection: simulations
+// Document ID: uuid
+// Fields:
+//   - user_id: string (required, matches owner)
+//   - scenario_id: string (required)
+//   - evaluation_score: number (optional)
+//   - chat_history: list (required, array of message objects)
+//   - ai_feedback: string (optional)
+//   - created_at: timestamp (required)
+//
+// Collection: flashcards
+// Document ID: uuid
+// Fields:
+//   - user_id: string (required, matches owner)
+//   - word_en: string (required)
+//   - translation_fr: string (required)
+//   - context_example: string (optional)
+//   - mastery_level: number (required, 1-5)
+//   - review_date: timestamp (required)
+//   - created_at: timestamp (required)
+//
+// Collection: emails
+// Document ID: uuid
+// Fields:
+//   - user_id: string (required, matches owner)
+//   - original_text: string (required, max 5000 chars)
+//   - corrected_text: string (required)
+//   - grammar_feedback: map (optional)
+//   - created_at: timestamp (required)
+//
+// ===============================================================
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.user_id;
+    }
+
+    function isRequestOwner() {
+      return isAuthenticated() && request.auth.uid == request.resource.data.user_id;
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+         (request.auth.token.email == "mohammedabba704@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return data.email is string && isValidEmail(data.email) &&
+             data.target_profession is string && data.target_profession.size() > 0 &&
+             data.target_language in ['English', 'French'] &&
+             data.estimated_level in ['beginner', 'intermediate', 'advanced'] &&
+             data.created_at is timestamp;
+    }
+
+    function isValidSimulation(data) {
+      return data.user_id is string && data.user_id == request.auth.uid &&
+             data.scenario_id is string &&
+             data.chat_history is list &&
+             data.created_at is timestamp;
+    }
+
+    function isValidFlashcard(data) {
+      return data.user_id is string && data.user_id == request.auth.uid &&
+             data.word_en is string && data.word_en.size() > 0 &&
+             data.translation_fr is string && data.translation_fr.size() > 0 &&
+             data.mastery_level is int && data.mastery_level >= 1 && data.mastery_level <= 5 &&
+             data.review_date is timestamp &&
+             data.created_at is timestamp;
+    }
+
+    function isValidEmailDoc(data) {
+      return data.user_id is string && data.user_id == request.auth.uid &&
+             data.original_text is string && data.original_text.size() <= 5000 &&
+             data.corrected_text is string &&
+             data.created_at is timestamp;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
+                      request.resource.data.email == resource.data.email; // Email immutable
+    }
+
+    match /simulations/{simulationId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isRequestOwner() && isValidSimulation(request.resource.data);
+      allow update: if isDocOwner() && isValidSimulation(request.resource.data) &&
+                      request.resource.data.user_id == resource.data.user_id;
+      allow delete: if isDocOwner();
+    }
+
+    match /flashcards/{flashcardId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isRequestOwner() && isValidFlashcard(request.resource.data);
+      allow update: if isDocOwner() && isValidFlashcard(request.resource.data) &&
+                      request.resource.data.user_id == resource.data.user_id;
+      allow delete: if isDocOwner();
+    }
+
+    match /emails/{emailId} {
+      allow read: if isDocOwner() || isAdmin();
+      allow create: if isRequestOwner() && isValidEmailDoc(request.resource.data);
+      allow update: if isDocOwner() && isValidEmailDoc(request.resource.data) &&
+                      request.resource.data.user_id == resource.data.user_id;
+      allow delete: if isDocOwner();
+    }
+  }
+}
