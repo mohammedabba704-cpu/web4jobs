@@ -85,11 +85,18 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return data.email is string && isValidEmail(data.email) &&
-             data.target_profession is string && data.target_profession.size() > 0 &&
-             data.target_language in ['English', 'French'] &&
-             data.estimated_level in ['beginner', 'intermediate', 'advanced'] &&
-             data.created_at is timestamp;
+      return data.email is string && isValidEmail(data.email);
+    }
+
+    function isValidLearner(data) {
+      return data.id == request.auth.uid &&
+             data.fullName is string && data.fullName.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.professionalStatus is string && data.professionalStatus.size() > 0 &&
+             data.role == 'learner' &&
+             data.currentLevel is string &&
+             data.createdAt is string &&
+             data.updatedAt is string;
     }
 
     function isValidSimulation(data) {
@@ -121,9 +128,14 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data) && 
-                      request.resource.data.email == resource.data.email; // Email immutable
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+    }
+
+    match /learners/{learnerId} {
+      allow read: if isOwner(learnerId) || isAdmin();
+      allow create: if isOwner(learnerId) && isValidLearner(request.resource.data);
+      allow update: if isOwner(learnerId) && isValidLearner(request.resource.data);
     }
 
     match /simulations/{simulationId} {

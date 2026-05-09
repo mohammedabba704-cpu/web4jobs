@@ -3,7 +3,23 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>Web4jobs Lingo</title>
+    <script>
+      (function() {
+        // Intercept assignments to window.fetch to prevent "only a getter" TypeError
+        // from libraries that try to polyfill fetch in strict mode over an iframe context.
+        var origFetch = window.fetch;
+        try {
+          Object.defineProperty(window, 'fetch', {
+            get: function() { return origFetch; },
+            set: function(val) { console.warn('Ignored attempt to assign to window.fetch'); },
+            configurable: true
+          });
+        } catch (e) {
+          // ignore
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

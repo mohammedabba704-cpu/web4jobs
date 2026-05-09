@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { cn } from "../lib/utils";
 import { useLanguage } from "../lib/LanguageContext";
+import AIAssistant from "./AIAssistant";
 
 interface LayoutProps {
   user: User | null;
@@ -57,10 +58,11 @@ export default function Layout({ user }: LayoutProps) {
 
   const sidebarItems = [
     { name: t("dashboard"), path: "/", icon: LayoutDashboard },
-    { name: t("myCourses"), path: "/simulator", icon: GraduationCap },
-    { name: t("vocabulary"), path: "/flashcards", icon: BookOpen },
+    { name: t("courseCatalog") || "Catalogue", path: "/courses", icon: GraduationCap },
+    { name: t("placementTest") || "Test IA", path: "/placement", icon: BookOpen },
     { name: t("speaking"), path: "/simulator", icon: Mic2 },
     { name: t("writing"), path: "/emails", icon: PenTool },
+    { name: t("aiAdmin") || "Admin IA", path: "/admin", icon: Settings },
     { name: t("settings"), path: "/settings", icon: Settings },
   ];
 
@@ -98,7 +100,7 @@ export default function Layout({ user }: LayoutProps) {
                 referrerPolicy="no-referrer"
               />
             </div>
-            <h1 className="text-xl font-bold tracking-tight">Web4jobs lingo</h1>
+            <h1 className="text-xl font-bold tracking-tight">Web4jobs Lingo</h1>
           </Link>
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
@@ -111,7 +113,7 @@ export default function Layout({ user }: LayoutProps) {
         <nav className="flex-1 px-4 space-y-2">
           {sidebarItems.map((item) => (
             <Link
-              key={item.path}
+              key={`${item.path}-${item.name}`}
               to={item.path}
               className={cn(
                 "flex items-center gap-4 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
@@ -167,7 +169,7 @@ export default function Layout({ user }: LayoutProps) {
             <nav className="hidden lg:flex items-center gap-8">
               {topNavItems.map((item) => (
                 <Link
-                  key={item.path}
+                  key={`${item.path}-${item.name}`}
                   to={item.path}
                   className={cn(
                     "text-sm font-medium transition-all relative py-2",
@@ -191,7 +193,7 @@ export default function Layout({ user }: LayoutProps) {
                   referrerPolicy="no-referrer"
                 />
               </div>
-              <span className="font-bold text-lg tracking-tight">Web4jobs lingo</span>
+              <span className="font-bold text-lg tracking-tight">Web4jobs Lingo</span>
             </Link>
           </div>
 
@@ -229,10 +231,11 @@ export default function Layout({ user }: LayoutProps) {
         {/* Page Content */}
         <main className="flex-1 overflow-auto px-4 lg:px-10 pb-10 pt-4 lg:pt-0">
           <div className="max-w-6xl mx-auto">
-            <Outlet />
+             <Outlet />
           </div>
         </main>
       </div>
+      <AIAssistant />
     </div>
   );
 }

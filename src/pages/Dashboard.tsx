@@ -1,22 +1,24 @@
 import { useState, useEffect } from "react";
 import { auth, db } from "../firebase";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDoc, doc } from "firebase/firestore";
 import { 
   Play, 
   CheckCircle2, 
   ChevronRight, 
   Lightbulb, 
   TrendingUp,
-  Mail,
-  Handshake,
+  Brain,
   MonitorPlay,
   MoreHorizontal,
   ChevronDown,
   GraduationCap,
-  Mic2
+  Target,
+  AlertTriangle,
+  Youtube
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "../lib/LanguageContext";
+import { AIOrchestrator, CEFR_METADATA } from "../lib/orchestrator";
 
 export default function Dashboard() {
   const [stats, setStats] = useState({
@@ -24,10 +26,40 @@ export default function Dashboard() {
     simulations: 0,
     flashcards: 0
   });
+  const [learnerData, setLearnerData] = useState<any>(null);
   const { t } = useLanguage();
+
+  // Mock User Profile for AI Orchestrator
+  const userProfile = {
+    cefrLevel: learnerData?.currentLevel !== 'non évalué' && learnerData?.currentLevel ? learnerData.currentLevel : "A1",
+    target_language: "English",
+    weakestSkill: "Grammar",
+    strongestSkill: "Vocabulary",
+    averageScore: 45, // Below 50 to trigger downgrade alert based on rules
+    completedCourses: 4,
+    recentPerformances: [
+      { score: 40 }, { score: 45 }, { score: 50 }, { score: 45 }
+    ] // Average ~45
+  };
+
+  const levelInfo = CEFR_METADATA[userProfile.cefrLevel] || CEFR_METADATA["A1"];
+  const levelAdjustment = AIOrchestrator.adjustLevel(userProfile, userProfile.recentPerformances);
+  const recommendationsInfo = AIOrchestrator.recommendCourses(userProfile, 3);
 
   useEffect(() => {
     if (!auth.currentUser) return;
+
+    const fetchLearner = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "learners", auth.currentUser!.uid));
+        if (docSnap.exists()) {
+          setLearnerData(docSnap.data());
+        }
+      } catch (err) {
+        console.error("Failed to load learner data", err);
+      }
+    };
+    fetchLearner();
 
     const qEmails = query(collection(db, "emails"), where("user_id", "==", auth.currentUser.uid));
     const qSims = query(collection(db, "simulations"), where("user_id", "==", auth.currentUser.uid));
@@ -50,190 +82,163 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
         <div>
           <h1 className="text-4xl font-bold mb-2">
-            {t("welcome")}, {auth.currentUser?.email?.split('@')[0] || "User"}!
+            {t("welcome")}, {learnerData?.fullName || auth.currentUser?.email?.split('@')[0] || "User"}!
           </h1>
           <p className="text-white/60 text-lg">
-            {t("dashboardSubtitle")}
+            Voici ton espace d'apprentissage Web4Jobs Lingo.
           </p>
         </div>
         <div className="flex gap-4">
-          <Link to="/simulator" className="glass-button px-8 py-3 rounded-xl font-bold flex items-center gap-3 shadow-lg">
-            <Play className="w-5 h-5 fill-current" />
-            {t("takeALesson")}
-          </Link>
-          <Link to="/emails" className="glass-button px-8 py-3 rounded-xl font-bold flex items-center gap-3 shadow-lg">
-            <CheckCircle2 className="w-5 h-5" />
-            {t("startPractice")}
-          </Link>
+          {learnerData?.currentLevel === 'non évalué' || !learnerData?.currentLevel ? (
+            <Link to="/placement" className="bg-pro-purple-500 hover:bg-pro-purple-400 px-8 py-3 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-all text-white">
+              <Brain className="w-5 h-5" />
+              Passer le test de niveau
+            </Link>
+          ) : (
+            <Link to="/courses" className="bg-pro-purple-500 hover:bg-pro-purple-400 px-8 py-3 rounded-xl font-bold flex items-center gap-3 shadow-lg transition-all text-white">
+              <Play className="w-5 h-5" />
+              Continuer mon parcours
+            </Link>
+          )}
         </div>
       </div>
+
+      {/* Profil Apprenant */}
+      <div className="glass-card p-6 border border-white/10 flex flex-wrap gap-6 items-center w-full">
+        <div className="flex flex-col">
+          <span className="text-white/60 text-xs font-bold uppercase">Email</span>
+          <span className="text-white font-medium">{learnerData?.email || auth.currentUser?.email}</span>
+        </div>
+        <div className="w-px h-10 bg-white/10 hidden md:block"></div>
+        <div className="flex flex-col">
+          <span className="text-white/60 text-xs font-bold uppercase">Situation Pro</span>
+          <span className="text-white font-medium">{learnerData?.professionalStatus || 'Non renseignée'}</span>
+        </div>
+        <div className="w-px h-10 bg-white/10 hidden md:block"></div>
+        <div className="flex flex-col">
+          <span className="text-white/60 text-xs font-bold uppercase">Niveau Actuel</span>
+          <span className="text-pro-purple-400 font-bold">{learnerData?.currentLevel || 'non évalué'}</span>
+        </div>
+      </div>
+
+      {/* AI Alert System */}
+      {(levelAdjustment.action === "DOWNGRADE" || levelAdjustment.action === "UPGRADE") && (
+        <div className={`p-6 rounded-2xl border flex items-start gap-4 shadow-2xl ${
+          levelAdjustment.action === "DOWNGRADE" 
+          ? "bg-red-500/10 border-red-500/30" 
+          : "bg-green-500/10 border-green-500/30"
+        }`}>
+          <div className={`p-3 rounded-xl ${levelAdjustment.action === "DOWNGRADE" ? "bg-red-500/20" : "bg-green-500/20"}`}>
+            {levelAdjustment.action === "DOWNGRADE" ? <AlertTriangle className="w-6 h-6 text-red-400" /> : <TrendingUp className="w-6 h-6 text-green-400" />}
+          </div>
+          <div className="flex-1">
+            <h3 className={`font-bold text-lg mb-1 ${levelAdjustment.action === "DOWNGRADE" ? "text-red-400" : "text-green-400"}`}>
+              {levelAdjustment.action === "DOWNGRADE" ? "Alerte de niveau : Difficultés détectées" : "Progression fulgurante !"}
+            </h3>
+            <p className="text-white/80 leading-relaxed mb-4">{levelAdjustment.reason}</p>
+            <button className={`px-6 py-2 rounded-lg font-bold text-sm ${
+              levelAdjustment.action === "DOWNGRADE" ? "bg-red-500/20 border border-red-500/30 hover:bg-red-500/30" : "bg-green-500/20 border border-green-500/30 hover:bg-green-500/30"
+            }`}>
+              {levelAdjustment.action === "DOWNGRADE" ? `Accepter le retour en ${levelAdjustment.newLevel}` : `Passer au niveau ${levelAdjustment.newLevel}`}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        
+        {/* Current Level Card */}
+        <div className="glass-card p-6 flex flex-col justify-center relative overflow-hidden group">
+           <div className="absolute top-0 right-0 p-4 opacity-10">
+             <Target className="w-24 h-24" />
+           </div>
+           <h2 className="text-white/60 font-medium mb-1">Niveau Actuel</h2>
+           <h3 className="text-4xl font-bold text-pro-purple-400 mb-2">{userProfile.cefrLevel}</h3>
+           <p className="text-sm text-white/50">{levelInfo?.description.substring(0, 50)}...</p>
+        </div>
+
+        {/* Global Progress */}
+        <div className="glass-card p-6 flex flex-col justify-center relative overflow-hidden group">
+           <h2 className="text-white/60 font-medium mb-1">Score Moyen</h2>
+           <h3 className={`text-4xl font-bold mb-2 ${userProfile.averageScore < 50 ? 'text-red-400' : 'text-green-400'}`}>{userProfile.averageScore}%</h3>
+           <p className="text-sm text-white/50">{userProfile.completedCourses} cours terminés ce mois-ci</p>
+        </div>
+
+        {/* Strong Skills */}
+        <div className="glass-card p-6 flex flex-col justify-center">
+           <h2 className="text-white/60 font-medium mb-1">Compétence Forte</h2>
+           <div className="flex items-center gap-3 mt-2">
+             <div className="p-2 bg-green-500/20 rounded-lg">
+               <TrendingUp className="w-6 h-6 text-green-400" />
+             </div>
+             <span className="font-bold text-xl">{userProfile.strongestSkill}</span>
+           </div>
+        </div>
+
+        {/* Weak Skills */}
+        <div className="glass-card p-6 flex flex-col justify-center">
+           <h2 className="text-white/60 font-medium mb-1">À Améliorer</h2>
+           <div className="flex items-center gap-3 mt-2">
+             <div className="p-2 bg-orange-500/20 rounded-lg">
+               <CheckCircle2 className="w-6 h-6 text-orange-400" />
+             </div>
+             <span className="font-bold text-xl">{userProfile.weakestSkill}</span>
+           </div>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Current Course Card */}
-        <div className="lg:col-span-4 glass-card p-8 flex flex-col justify-between min-h-[300px] relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 opacity-20 group-hover:opacity-40 transition-opacity">
-            <GraduationCap className="w-32 h-32 -mr-10 -mt-10" />
+        
+        {/* Recommended Path column */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="flex items-center gap-3">
+             <Brain className="w-6 h-6 text-pro-purple-400" />
+             <h2 className="text-2xl font-bold">Plan Personnalisé IA</h2>
           </div>
-          
-          <div className="relative">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-xl font-bold text-white/70 uppercase tracking-widest text-sm">{t("currentCourse")}</h2>
-              <MoreHorizontal className="w-6 h-6 text-white/40" />
-            </div>
-            <h3 className="text-3xl font-bold mb-2">{t("businessEnglish")}</h3>
-            <p className="text-white/60 font-medium">{t("progress")}: 40%</p>
-          </div>
+          <p className="text-white/60">{recommendationsInfo.reason}</p>
 
-          <div className="relative space-y-6">
-            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
-              <div className="h-full bg-pro-purple-400 w-[40%] rounded-full shadow-[0_0_15px_rgba(159,122,234,0.5)]" />
-            </div>
-            <div className="flex gap-3">
-              <Link to="/simulator" className="flex-1 glass-button py-3 rounded-xl text-sm font-bold text-center">
-                {t("resumeCourse")}
-              </Link>
-              <Link to="/settings" className="flex-1 bg-white/5 hover:bg-white/10 border border-white/10 py-3 rounded-xl text-sm font-bold transition-all text-center">
-                {t("changeCourse")}
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Practice Card */}
-        <div className="lg:col-span-4 glass-card p-8 flex flex-col">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 bg-pro-purple-500/30 rounded-xl flex items-center justify-center">
-              <TrendingUp className="w-6 h-6 text-pro-purple-300" />
-            </div>
-            <h2 className="text-xl font-bold">{t("quickPractice")}</h2>
-          </div>
-          
-          <div className="space-y-4 flex-1">
-            <Link to="/flashcards" className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-pro-purple-400/20 rounded-full flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-pro-purple-300" />
-                </div>
-                <span className="font-bold">{t("vocabularyQuiz")}</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-white transition-colors" />
-            </Link>
-            
-            <Link to="/simulator" className="w-full flex items-center justify-between p-5 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/5 transition-all group">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-pro-purple-400/20 rounded-full flex items-center justify-center">
-                  <Mic2 className="w-5 h-5 text-pro-purple-300" />
-                </div>
-                <span className="font-bold">{t("speakingExercise")}</span>
-              </div>
-              <ChevronRight className="w-5 h-5 text-white/20 group-hover:text-white transition-colors" />
-            </Link>
-          </div>
-        </div>
-
-        {/* Daily Tip & Progress Overview Column */}
-        <div className="lg:col-span-4 space-y-6 flex flex-col">
-          {/* Daily Tip */}
-          <div className="glass-card p-6 bg-gradient-to-br from-pro-purple-600/40 to-pro-purple-800/40 border-pro-purple-400/30">
-            <div className="flex items-center gap-3 mb-4">
-              <Lightbulb className="w-6 h-6 text-yellow-400" />
-              <h2 className="font-bold">{t("dailyTip")}</h2>
-            </div>
-            <p className="text-sm text-white/80 leading-relaxed">
-              {t("dailyTipContent")}
-            </p>
-          </div>
-
-          {/* Progress Overview */}
-          <div className="glass-card p-6 flex-1 flex flex-col">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <TrendingUp className="w-5 h-5 text-pro-purple-300" />
-                <h2 className="font-bold">{t("progressOverview")}</h2>
-              </div>
-              <ChevronDown className="w-4 h-4 text-white/40" />
-            </div>
-
-            <div className="flex-1 flex items-center justify-between gap-4">
-              <div className="space-y-4">
-                <p className="text-xs font-bold text-white/40 uppercase tracking-widest">{t("thisWeek")}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {recommendationsInfo.recommendations.map((course: any, i: number) => (
+              <div key={i} className="glass-card p-6 flex flex-col justify-between group">
                 <div>
-                  <p className="text-xs text-white/60 mb-1">{t("lessonsCompleted")}: <span className="text-white font-bold">3</span></p>
-                  <p className="text-xs text-white/60">{t("wordsLearned")}: <span className="text-white font-bold">45</span></p>
+                  <div className="flex justify-between items-start mb-4">
+                    <span className="text-xs bg-pro-purple-500/20 text-pro-purple-300 px-2 py-1 rounded">{course.category}</span>
+                    <span className="text-xs bg-white/10 px-2 py-1 rounded">{course.level}</span>
+                  </div>
+                  <h3 className="font-bold mb-2 group-hover:text-pro-purple-300 transition-colors">{course.title}</h3>
+                  <p className="text-sm text-white/50 mb-6">{course.duration}</p>
                 </div>
+                <Link to="/courses" className="glass-button w-full py-2 rounded-lg text-sm font-bold text-center block">
+                  {t("start")}
+                </Link>
               </div>
-              
-              <div className="relative w-24 h-24">
-                <svg className="w-full h-full transform -rotate-90">
-                  <circle
-                    cx="48"
-                    cy="48"
-                    r="40"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="transparent"
-                    className="text-white/10"
-                  />
-                  <circle
-                    cx="48"
-                    cy="48"
-                    r="40"
-                    stroke="currentColor"
-                    strokeWidth="8"
-                    fill="transparent"
-                    strokeDasharray={251.2}
-                    strokeDashoffset={251.2 * (1 - 0.6)}
-                    className="text-pro-purple-400 drop-shadow-[0_0_8px_rgba(159,122,234,0.8)]"
-                  />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-xl font-bold">60%</span>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
-      </div>
 
-      {/* Recommended Lessons */}
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold">{t("recommendedPath")}</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[
-            { title: t("emailWriting"), desc: t("effectiveEmailDesc"), icon: Mail },
-            { title: t("negotiationSkills"), desc: t("negotiationDesc"), icon: Handshake },
-            { title: t("presentationTechniques"), desc: t("presentationDesc"), icon: MonitorPlay },
-          ].map((lesson, i) => (
-            <div key={i} className="glass-card p-6 group hover:bg-white/15 transition-all">
-              <div className="w-12 h-12 bg-pro-purple-500/20 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <lesson.icon className="w-6 h-6 text-pro-purple-300" />
-              </div>
-              <h3 className="text-xl font-bold mb-2">{lesson.title}</h3>
-              <p className="text-sm text-white/50 mb-6">{lesson.desc}</p>
-              <Link to={lesson.title === t("emailWriting") ? "/emails" : "/simulator"} className="glass-button w-full py-2 rounded-lg text-sm font-bold text-center block">
-                {t("start")}
-              </Link>
-            </div>
-          ))}
+        {/* Video Recommendations */}
+        <div className="lg:col-span-4 space-y-6">
+          <div className="flex items-center gap-3">
+             <Youtube className="w-6 h-6 text-red-500" />
+             <h2 className="text-2xl font-bold">Vidéos Recommandées</h2>
+          </div>
+          
+          <div className="space-y-4">
+            {(recommendationsInfo.recommendations[0]?.videos || []).slice(0, 3).map((video: any, i: number) => (
+              <a key={i} href={video.url} target="_blank" rel="noreferrer" className="block glass-card p-4 hover:bg-white/10 transition-all border border-transparent hover:border-red-500/30 group">
+                <h4 className="font-bold text-sm mb-1 group-hover:text-red-400 transition-colors line-clamp-1">{video.title}</h4>
+                <p className="text-xs text-white/50 line-clamp-2">{video.reason}</p>
+              </a>
+            ))}
+            
+            <a href="https://www.youtube.com/watch?v=2sCXhPefmz8&list=PLcoQWyFpRIxgcTcTpz-hmpDqhcRq701sb" target="_blank" rel="noreferrer" className="block p-4 mt-4 bg-pro-purple-900/40 border border-pro-purple-500/30 rounded-xl hover:bg-pro-purple-800/40 transition-all">
+              <h4 className="font-bold text-sm mb-1 text-pro-purple-300">Playlist Obligatoire - Fondamentaux</h4>
+              <p className="text-xs text-white/60">Une sélection IA pour renforcer vos acquis généraux.</p>
+            </a>
+          </div>
         </div>
-      </div>
 
-      {/* Live Conversation Practice */}
-      <div className="glass-card p-6 flex flex-col md:flex-row items-center justify-between gap-6 bg-gradient-to-r from-pro-purple-900/40 to-pro-purple-600/20">
-        <div className="flex items-center gap-6">
-          <div className="w-12 h-12 bg-pro-purple-400/20 rounded-full flex items-center justify-center animate-pulse">
-            <div className="w-4 h-4 bg-pro-purple-400 rounded-full" />
-          </div>
-          <div>
-            <h2 className="text-xl font-bold">{t("liveConversation")}</h2>
-            <p className="text-white/60">{t("upcomingSession")}: <span className="text-white font-bold">3:00 PM</span></p>
-          </div>
-        </div>
-        <Link to="/simulator" className="glass-button px-10 py-3 rounded-xl font-bold flex items-center gap-3 group">
-          {t("joinSession")}
-          <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-        </Link>
       </div>
     </div>
   );

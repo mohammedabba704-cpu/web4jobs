@@ -43,19 +43,31 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
     setLoading(true);
     setError(null);
     try {
-      await setDoc(doc(db, "users", auth.currentUser.uid), {
-        email: auth.currentUser.email,
-        target_profession: profession,
-        target_language: language,
-        estimated_level: evaluation.estimatedLevel,
-        recommendations: evaluation.recommendations,
-        created_at: serverTimestamp(),
-      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("La connexion Firebase a expiré. Êtes-vous hors ligne ?")), 8000)
+      );
+
+      await Promise.race([
+        setDoc(doc(db, "users", auth.currentUser.uid), {
+          email: auth.currentUser.email,
+          target_profession: profession,
+          target_language: language,
+          estimated_level: evaluation.estimatedLevel,
+          recommendations: evaluation.recommendations,
+          created_at: serverTimestamp(),
+        }),
+        timeoutPromise
+      ]);
       onComplete();
       navigate("/");
     } catch (err: any) {
       console.error("Profile creation failed:", err);
-      setError("Failed to save your profile. Please try again.");
+      // Give a helpful error if it's permission or connection
+      setError(
+          err.message.includes("expiré") 
+            ? "Erreur de connexion. Votre configuration Firebase est incomplète ou vous êtes hors ligne." 
+            : "Impossible de créer votre profil. La base de données Firestore est-elle créée ?"
+      );
     } finally {
       setLoading(false);
     }

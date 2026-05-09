@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0778654585",
-  "appId": "1:540812811366:web:17a5795b3acf226e9e61a7",
-  "apiKey": "AIzaSyDZbSp3UkcK0b-mKXaKY2VuYPIIA7YVKxA",
-  "authDomain": "gen-lang-client-0778654585.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-a51429f8-fbc4-458d-b16d-568d76338886",
-  "storageBucket": "gen-lang-client-0778654585.firebasestorage.app",
-  "messagingSenderId": "540812811366",
+  "projectId": "web4jobs-7d9eb",
+  "appId": "1:363627704246:web:97b660b7d730f5edb8db17",
+  "apiKey": "AIzaSyCuCDtTCdxIX5f6KkaDjV5P17V58FgCmLw",
+  "authDomain": "web4jobs-7d9eb.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "web4jobs-7d9eb.firebasestorage.app",
+  "messagingSenderId": "363627704246",
   "measurementId": ""
 }
